@@ -1,0 +1,35 @@
+{
+  "module": "dob",
+  "request_id": "EXAMPLE-1",
+  "tab": "pending",
+  "tabs": ["pending"],
+  "collected_at": "2026-01-01T10:00:00",
+  "list_row": {
+    "FamilyID": "AAA00001",
+    "Name": "Example Person",
+    "Father Name": "Example Father",
+    "Dob In PPP": "01-01-1990",
+    "Requested DOB": "15-06-1988"
+  },
+  "case": {
+    "User Info": {
+      "Name": "Example Person",
+      "Father Name": "Example Father",
+      "Mother Name": "Example Mother",
+      "DOB In PPP": "01-01-1990",
+      "Requested DOB": "15-06-1988",
+      "Uploaded Document": "Voter ID",
+      "Document Number": "ABC1234567"
+    },
+    "ZCRIM Remark (Example Name)": {
+      "Status": "Forwarded",
+      "Reason": "",
+      "Remarks": "Document verified",
+      "Action Date": "02-01-2026 10:00"
+    }
+  },
+  "family": [
+    {"S.No": "1", "Full Name": "Example Person", "Father Name": "Example Father", "Mother Name": "Example Mother",
+     "Spouse Name": "", "Relation With HOF": "Self", "Date of Birth": "01-01-1990", "Gender": "Male"}
+  ]
+}

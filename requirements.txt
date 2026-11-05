@@ -1,0 +1,13 @@
+# Python packages (installed into .venv by "Install (run once)")
+pypdfium2>=4.30
+opencv-python-headless>=4.8
+numpy>=1.26
+pypdf>=4.0
+PyYAML>=6.0
+pyzbar>=0.1.9
+pytesseract>=0.3.10
+Pillow>=10.0
+playwright>=1.44
+# Apple Vision text recognition (macOS only, offline; used to read photographed certificates)
+pyobjc-framework-Vision>=10; sys_platform == "darwin"
+pyobjc-framework-Quartz>=10; sys_platform == "darwin"

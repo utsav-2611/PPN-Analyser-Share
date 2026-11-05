@@ -1,0 +1,16 @@
+# Officer-editable rules.
+# government_suffixes: a QR on a host equal to or ending in "." + suffix is genuine (officer's rule).
+# allowed_hosts: hosts the analyser actually opens (a verifier exists). Same matching.
+government_suffixes:
+  - gov.in
+  - nic.in
+allowed_hosts:
+  - crsorgi.gov.in
+  - dc.crsorgi.gov.in
+  - edisha.gov.in
+  - online.ulbharyana.gov.in
+  - bnd.ndmc.gov.in
+  - mcdonline.nic.in
+  - pehchan.rajasthan.gov.in
+  - pehchan.raj.nic.in
+  - adjudication.igrmaharashtra.gov.in

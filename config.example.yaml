@@ -1,0 +1,8 @@
+# Copy this file to config.yaml and edit it. config.yaml is private to your machine and is never committed.
+
+# Folder that holds the requests (DOB/, Marital/, Marriage-Divorce/) and Electors/.
+# Leave it out to use the "data" folder inside this project.
+# data_root: ~/Documents/ppn-data
+
+# The electoral roll database (see data/Electors/README.md). Leave it out to use <data_root>/Electors/electors.db
+# electors_db: ~/Documents/ppn-data/Electors/electors.db

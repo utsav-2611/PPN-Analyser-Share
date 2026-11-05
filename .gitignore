@@ -1,0 +1,42 @@
+# ---- Everything below is specific to one user or holds citizen data: it must never be committed ----
+# local settings (data folder)
+/config.yaml
+# requests, logs, electoral roll database: the whole data folder except the placeholders
+/data/*
+!/data/Electors/
+/data/Electors/*
+!/data/Electors/.gitkeep
+!/data/Electors/README.md
+# results and caches (OCR text, official-site responses, probe reports)
+/store/
+# development copies of collected requests, reference recommendations and run outputs
+/dev/
+/reference/
+/logs/
+/requests/
+case.json
+cases.csv
+case_window*.png
+document.pdf
+doc_text.txt
+analysis.json
+qr.json
+*.db
+*.sqlite
+*.sqlite3
+*.zip
+# ---- tooling ----
+.venv/
+__pycache__/
+*.pyc
+.DS_Store
+.idea/
+.vscode/
+*.egg-info/
+# knowledge graph output (derived, regenerable)
+/graphify-out/
+/.claude/
+
+
+# made-up sample requests that document the input format
+!/examples/**/case.json
