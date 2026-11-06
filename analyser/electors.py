@@ -61,3 +61,12 @@ def lookup(epic, db_path=None):
         return out
     finally:
         con.close()
+
+
+EPIC_IN_TEXT = re.compile(r"\b[A-Z]{3}\s?\d{7}\b|\bHR\s?/\s?\d{1,2}\s?/\s?\d{1,3}\s?/\s?\d{4,7}\b", re.I)
+
+
+def find_epic(text):
+    """The first EPIC written in document text ('ABC1234567' or old style 'HR/12/123/456789'), or ''."""
+    m = EPIC_IN_TEXT.search(text or "")
+    return re.sub(r"\s+", "", m.group(0)).upper() if m else ""

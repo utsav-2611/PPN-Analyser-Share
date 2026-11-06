@@ -46,7 +46,7 @@ def decide_for_store(req):
 
 def record_for(req, d, analysed_at):
     """The result record for one request and its Decision."""
-    lists = [x for x in (req.tab, *(req.raw.get("tabs") or [])) if x in ("priority", "pending", "newRegistration")]
+    lists = [x for x in (req.tab, *(req.raw.get("tabs") or [])) if x in ("lly", "priority", "pending", "newRegistration")]
     return {
         "id": req.id, "module": req.module, "requestId": req.request_id, "name": req.name, "familyId": req.family_id,
         "lists": list(dict.fromkeys(lists)), "requestType": req.request_type, "flag": req.flag,

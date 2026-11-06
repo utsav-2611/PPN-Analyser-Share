@@ -62,10 +62,10 @@ passport, government ID card (armed forces discharge certificate), birth certifi
   **Haryana** it is accepted for any change of date. From a school **outside Haryana**, a change of more than two years from the PPP date is REJECT. When the
   state cannot be read and the change exceeds two years, HOLD.
 - **Voter ID.** The EPIC is checked against the electoral roll (leading zero of the last number added or removed, slashes and spaces ignored).
-  An EPIC **not in the roll is REJECT**. Issued after 2019 is REJECT (applied when the issue year can be read from the card). If the card gives "age as on <date>", the requested date of birth must fall in the one-year
-  range before that date (otherwise REJECT). A card that gives an age with no date is compared with the roll's date, one year either way; a mismatch is HOLD.
+  An EPIC **not in the roll is REJECT**. The EPIC is the one typed on the request, else the one read from the card; none: HOLD. Issued after 2019 is REJECT (applied when the issue year can be read from the card). If the card gives "age as on <date>", the requested date of birth must fall in the one-year
+  range before that date (otherwise REJECT). A card with no date of birth and no dated age is decided from the roll entry's age and date (the requested date of birth must fall in that year: APPROVE, else REJECT; HOLD only when the roll entry has no age). A different full date on the card is still compared with the card.
 - **Electoral roll certificate.** The EPIC is checked against the roll. The certificate agrees with the roll (age, allowing for the years since the roll
-  date) and with the requested date: APPROVE. It differs: REJECT. EPIC not in the roll: HOLD, sent to the Election office for verification.
+  date) and with the requested date: APPROVE. It differs: REJECT. EPIC not in the roll: REJECT (the certificate is given to a living person, who is in the roll). A certificate that shows no age or date of birth is decided from the roll age in the same way. EPIC as for the voter ID.
 - **Birth certificate.** Fake QR host: REJECT. A QR on the official CRS portal: the record is read and its date of birth must equal the requested date
   (REJECT if not); name and parents are compared (both parents and name differ, REJECT; both parents differ with the name matching, or father only, HOLD; mother
   only or name only, APPROVE with a note). If the record cannot be read, HOLD for DCRIM. No readable QR: APPROVE when the date of birth read from the certificate equals the requested date and that date is in the year 2000 or later (any issuing state); otherwise REJECT if issued by Haryana, else HOLD.

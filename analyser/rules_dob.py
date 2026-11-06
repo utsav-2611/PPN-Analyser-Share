@@ -13,7 +13,12 @@ Officer's changes of 23 10 2026:
     school outside Haryana a change of more than 2 years is rejected; HOLD only when unreadable
  3. voter ID whose EPIC is not in the electoral roll -> REJECT
  5. electoral roll certificate: EPIC checked against the roll; certificate agrees with the roll -> APPROVE, differs ->
-    REJECT, EPIC not in the roll -> HOLD for the Election office to verify the certificate
+    REJECT, EPIC not in the roll -> REJECT (6 Nov 2026: a certificate is given to a living person, who is in the roll)
+Officer's changes of 6 11 2026:
+ - EPIC verified in the roll and the card or certificate gives no DOB or no dated age -> decided from the roll's age
+   (requested DOB fits it -> APPROVE, else REJECT); HOLD only when the roll entry has no age
+ - the EPIC is the one typed on the request, else the one read from the document; none -> HOLD
+ - birth certificate with unreadable QR, DOB read, PPP DOB changed: Haryana certificate -> REJECT, else HOLD
  7. no document -> REJECT
 """
 import re
@@ -197,7 +202,10 @@ def _voter(req, ev, new, ppp, changed, change, base):
     if ev.issue_year and ev.issue_year > LAST_VOTER_ISSUE_YEAR:
         return _done(req, "REJECT", f"Voter ID issued in {ev.issue_year} is after {LAST_VOTER_ISSUE_YEAR} and is not accepted for DOB",
                      flags=["Voter ID issued after 2019"], **base)
-    if ev.epic_rows is not None and not ev.epic_rows:
+    if ev.epic_rows is None:
+        return _done(req, "HOLD", "EPIC of the voter ID was not typed on the request and could not be read from the card so officer to check",
+                     flags=["EPIC not read"], **base)
+    if not ev.epic_rows:
         return _done(req, "REJECT", f"EPIC {epic} of the voter ID is not found in the electoral roll so voter ID is not verified",
                      flags=["EPIC not in roll"], **base)
     in_roll = "EPIC verified in electoral roll"
@@ -208,8 +216,9 @@ def _voter(req, ev, new, ppp, changed, change, base):
                          flags=["Voter ID age range"], **base)
         return _done(req, "REJECT", f"Voter ID {epic} shows age {age} as on {match.fmt_date(as_on)} and requested DOB {match.fmt_date(new)} is outside that range",
                      flags=["Outside voter ID age range"], **base)
-    if ev.plain_age is not None and ev.dob_found != "exact":
-        return _plain_age(req, ev, new, change, f"Voter ID {epic} {in_roll}", base)
+    if ev.dob_found is None and (ev.plain_age is not None or not (ev.dob_dates or ev.dob_years)):
+        # the card gives no date of birth and no dated age: the roll entry of the EPIC decides
+        return _from_roll(req, ev, new, change, f"Voter ID {epic} {in_roll}", base)
     return _dob_check(req, ev, new, ppp, changed, change, f"Voter ID {epic} {in_roll}", base)
 
 
@@ -222,19 +231,19 @@ def _roll_age(ev):
     return (int(age), as_on) if as_on and age is not None else None
 
 
-def _plain_age(req, ev, new, change, name, base):
-    """The document gives an age and no date: it is compared with the requested DOB at the date of the roll (one year
-    either way, because the date of the age is not stated)."""
+def _from_roll(req, ev, new, change, name, base):
+    """The document gives no date of birth and no dated age: the roll's age (with its date) is compared with the requested
+    DOB. The document's own undated age is no longer used, the roll is the authority."""
     roll = _roll_age(ev)
     if roll is None:
-        return _done(req, "HOLD", f"{name} gives age {ev.plain_age} without a date and the roll entry has no age date so officer to check DOB {match.fmt_date(new)}",
-                     flags=["Age without date"], **base)
-    years = match.age_on(new, roll[1])[0]
-    if abs(years - ev.plain_age) <= 1:
-        return _done(req, "APPROVE", f"{name} gives age {ev.plain_age} and requested DOB {match.fmt_date(new)} gives age {years} on {match.fmt_date(roll[1])} and {change}",
-                     flags=["Age matches"], **base)
-    return _done(req, "HOLD", f"{name} gives age {ev.plain_age} without a date and requested DOB {match.fmt_date(new)} gives age {years} on {match.fmt_date(roll[1])} so officer to read the card",
-                 flags=["Age differs, date unknown"], **base)
+        return _done(req, "HOLD", f"{name} gives no DOB and the roll entry has no age so officer to check DOB {match.fmt_date(new)}",
+                     flags=["Roll entry incomplete"], **base)
+    age, as_on = roll
+    if match.dob_fits_age(new, age, as_on):
+        return _done(req, "APPROVE", f"{name} shows in electoral roll age {age} as on {match.fmt_date(as_on)} and requested DOB {match.fmt_date(new)} is within that year and {change}",
+                     flags=["Roll age range"], **base)
+    return _done(req, "REJECT", f"{name} shows in electoral roll age {age} as on {match.fmt_date(as_on)} and requested DOB {match.fmt_date(new)} is outside that range",
+                 flags=["Outside roll age range"], **base)
 
 
 def _roll_certificate(req, ev, new, base):
@@ -242,9 +251,12 @@ def _roll_certificate(req, ev, new, base):
     diary = f" diary no {remark.clean(ev.diary)}" if ev.diary else ""
     epic = remark.clean(ev.epic_text or get(req.user_info, "Document Number"))
     shown = match.fmt_date
+    if ev.epic_rows is None:
+        return _done(req, "HOLD", f"EPIC was not typed on the request and could not be read from the electoral roll certificate{diary} so officer to check",
+                     flags=["EPIC not read"], **base)
     if not ev.epic_rows:
-        return _done(req, "HOLD", f"EPIC {epic} not found in electoral roll so electoral roll certificate{diary} sent to Election office for verification",
-                     flags=["EPIC not in roll"], analysis="EPIC of the certificate is not in the roll", **base)
+        return _done(req, "REJECT", f"EPIC {epic} not found in electoral roll so electoral roll certificate{diary} is not verified",
+                     flags=["Roll certificate EPIC not in roll"], analysis="EPIC of the certificate is not in the roll", **base)
     live = [r for r in ev.epic_rows if not r.get("deleted")] or ev.epic_rows
     roll = live[0]
     roll_as_on = match.parse_date(roll.get("age_as_on"))
@@ -271,8 +283,12 @@ def _roll_certificate(req, ev, new, base):
         doc = sorted(ev.dob_dates)[0]
         agrees, fits, said = match.dob_fits_age(doc, roll_age, roll_as_on), doc == new, f"DOB {shown(doc)}"
     else:
-        return _done(req, "HOLD", f"Electoral roll certificate{diary} age or DOB could not be read so sent to Election office for verification",
-                     flags=["Certificate DOB not read"], **base)
+        # the certificate shows no age or DOB: the roll entry of its EPIC decides
+        if match.dob_fits_age(new, roll_age, roll_as_on):
+            return _done(req, "APPROVE", f"Electoral roll certificate{diary} EPIC {epic} verified in electoral roll and requested DOB {shown(new)} is within {roll_range}",
+                         flags=["Roll age range"], **base)
+        return _done(req, "REJECT", f"Electoral roll certificate{diary} EPIC {epic} verified in electoral roll but requested DOB {shown(new)} is outside {roll_range}",
+                     flags=["Outside roll age range"], **base)
     if agrees and fits:
         return _done(req, "APPROVE", f"Electoral roll certificate{diary} EPIC {epic} verified in electoral roll shows {said} which agrees with {roll_range} and requested DOB {shown(new)}",
                      flags=["Roll certificate agrees with roll"], **base)
@@ -340,6 +356,8 @@ def _birth(req, ev, new, ppp, changed, change, base):
         return _done(req, "HOLD", "Birth certificate QR carries no government link so DCRIM to verify the certificate", flags=["QR not verifiable"], **base)
     # no readable QR
     if ev.dob_found == "exact" and new.year >= 2000:  # officer's rule 27 10 2026: the certificate's own DOB is enough from 2000
+        if ppp != new and ev.issuer == "haryana":  # officer's rule 6 11 2026: a Haryana certificate with an unreadable QR and a changed DOB
+            return _done(req, "REJECT", "QR is unreadable Applicant to visit the office of ADC with the original document", flags=["QR unreadable"], **base)
         if ppp != new:  # officer's rule 28 10 2026: only when the PPP DOB is the requested DOB, else HOLD
             return _done(req, "HOLD", f"Birth certificate QR is unreadable and certificate shows DOB {match.fmt_date(new)} same as requested DOB but PPP DOB is {match.fmt_date(ppp) if ppp else 'not available'} so officer to review the change",
                          flags=["QR unreadable, PPP DOB changed"], **base)
@@ -438,8 +456,9 @@ def gather(req):
     ev.plain_age = plain[0] if plain else None
     ev.dob_dates, ev.dob_years = dobtext.dob_context(text, same_line=ev.doc_class in (VOTER, ROLL_CERT))
     if ev.doc_class in (VOTER, ROLL_CERT):
-        ev.epic_text = get(ui, "Document Number")
-        ev.epic_rows = electors.lookup(ev.epic_text)
+        typed = get(ui, "Document Number")
+        ev.epic_text = typed if len(electors.normalize_epic(typed)) >= 6 else electors.find_epic(text)   # typed on the request first
+        ev.epic_rows = electors.lookup(ev.epic_text) if ev.epic_text else None
     if ev.doc_class == SLC:
         pages = _pages(req.pdf_path)
         ev.register_copy = bool((pages or 0) >= 2 or re.search(r"register", text, re.I) or "copy of school record" in label.lower())

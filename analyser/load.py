@@ -83,7 +83,7 @@ class Request:
 
     @property
     def is_lly(self):
-        return "lly" in norm(self.flag).split() or "lado lakshmi" in norm(self.flag)
+        return "lly" in norm(self.flag).split() or "lado lakshmi" in norm(self.flag) or "lly" in (self.raw.get("tabs") or [])
 
     @property
     def is_priority(self):

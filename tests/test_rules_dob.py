@@ -170,11 +170,27 @@ class VoterId(unittest.TestCase):
         d = run(rd.Evidence(doc_class=rd.VOTER, epic_rows=self.ROW, readable=False), self.INFO)
         self.assertEqual(d.recommendation, "HOLD")
 
-    def test_plain_age_against_roll_date(self):
-        roll = [{"epic": "ABC1234567", "age": 40, "age_as_on": "01-01-2019", "deleted": 0}]
-        ev = rd.Evidence(doc_class=rd.VOTER, epic_rows=roll, plain_age=18)
+    def test_no_dob_and_no_age_on_card_uses_roll_age(self):
+        roll = [{"epic": "ABC1234567", "age": 18, "age_as_on": "01-01-2019", "deleted": 0}]
+        ev = rd.Evidence(doc_class=rd.VOTER, epic_rows=roll)
+        d = run(ev, {**self.INFO, "Requested DOB": "15-06-2000"})
+        self.assertEqual(d.recommendation, "APPROVE", d.remark)
+        self.assertIn("age 18 as on 01 01 2019", d.remark)
+        self.assertEqual(run(ev, {**self.INFO, "Requested DOB": "15-06-1990"}).recommendation, "REJECT")
+
+    def test_a_different_full_date_on_card_still_rejects(self):
+        roll = [{"epic": "ABC1234567", "age": 18, "age_as_on": "01-01-2019", "deleted": 0}]
+        ev = rd.Evidence(doc_class=rd.VOTER, epic_rows=roll, dob_dates={date(1999, 1, 1)})
+        self.assertEqual(run(ev, {**self.INFO, "Requested DOB": "15-06-2000"}).recommendation, "REJECT")
+
+    def test_epic_not_typed_or_read_holds(self):
+        self.assertEqual(run(rd.Evidence(doc_class=rd.VOTER), self.INFO).recommendation, "HOLD")
+
+    def test_undated_card_age_is_ignored_roll_decides(self):
+        roll = [{"epic": "ABC1234567", "age": 18, "age_as_on": "01-01-2019", "deleted": 0}]
+        ev = rd.Evidence(doc_class=rd.VOTER, epic_rows=roll, plain_age=40)   # the undated card age is ignored
         self.assertEqual(run(ev, {**self.INFO, "Requested DOB": "15-06-2000"}).recommendation, "APPROVE")
-        self.assertEqual(run(ev, {**self.INFO, "Requested DOB": "15-06-1990"}).recommendation, "HOLD")
+        self.assertEqual(run(ev, {**self.INFO, "Requested DOB": "15-06-1990"}).recommendation, "REJECT")   # decided from the roll age
         ev = rd.Evidence(doc_class=rd.VOTER, epic_rows=[{"epic": "X", "age": None, "age_as_on": None}], plain_age=18)
         self.assertEqual(run(ev, self.INFO).recommendation, "HOLD")
 
@@ -183,11 +199,14 @@ class ElectoralRollCertificate(unittest.TestCase):
     INFO = {"Uploaded Document": "Voter ID", "Document Number": "ABC1234567", "Requested DOB": "15-06-2000"}
     ROLL = [{"epic": "ABC1234567", "age": 18, "age_as_on": "01-01-2019", "deleted": 0}]
 
-    def test_epic_not_in_roll_holds_for_election_office(self):
+    def test_epic_not_in_roll_rejects(self):
         d = run(rd.Evidence(doc_class=rd.ROLL_CERT, epic_rows=[], diary="123 of 05 06 2026"), self.INFO)
-        self.assertEqual(d.recommendation, "HOLD")
+        self.assertEqual(d.recommendation, "REJECT")
         self.assertIn("diary no 123 of 05 06 2026", d.remark)
-        self.assertIn("sent to Election office for verification", d.remark)
+        self.assertIn("Roll certificate EPIC not in roll", d.flags)
+
+    def test_epic_not_typed_or_read_holds(self):
+        self.assertEqual(run(rd.Evidence(doc_class=rd.ROLL_CERT), self.INFO).recommendation, "HOLD")
 
     def test_certificate_agrees_with_roll_approves(self):
         ev = rd.Evidence(doc_class=rd.ROLL_CERT, epic_rows=self.ROLL, ages=[(date(2019, 1, 1), 18)])
@@ -204,8 +223,12 @@ class ElectoralRollCertificate(unittest.TestCase):
         ev = rd.Evidence(doc_class=rd.ROLL_CERT, epic_rows=self.ROLL, dob_dates={date(1990, 6, 15)})
         self.assertEqual(run(ev, {**self.INFO, "Requested DOB": "15-06-1990"}).recommendation, "REJECT")
 
-    def test_nothing_readable_holds(self):
-        self.assertEqual(run(rd.Evidence(doc_class=rd.ROLL_CERT, epic_rows=self.ROLL), self.INFO).recommendation, "HOLD")
+    def test_nothing_readable_uses_roll_age(self):
+        ev = rd.Evidence(doc_class=rd.ROLL_CERT, epic_rows=self.ROLL)
+        self.assertEqual(run(ev, self.INFO).recommendation, "APPROVE")
+        self.assertEqual(run(ev, {**self.INFO, "Requested DOB": "15-06-1990"}).recommendation, "REJECT")
+        ev = rd.Evidence(doc_class=rd.ROLL_CERT, epic_rows=[{"epic": "X", "age": None, "age_as_on": None}])
+        self.assertEqual(run(ev, self.INFO).recommendation, "HOLD")
 
     def test_plain_age_agrees_with_roll(self):
         # roll age 18 on 01 01 2019; a certificate written years later may show a higher age
@@ -289,9 +312,12 @@ class BirthCertificate(unittest.TestCase):
         self.assertEqual(run(rd.Evidence(doc_class=rd.BIRTH, issuer="uttar pradesh", dob_found="exact"), self.INFO | {"DOB In PPP": "23-03-2001"}).recommendation, "APPROVE")
         self.assertEqual(run(rd.Evidence(doc_class=rd.BIRTH, issuer="haryana"), self.INFO).recommendation, "REJECT")  # DOB not confirmed
 
-    def test_no_qr_dob_changed_from_ppp_holds(self):
+    def test_no_qr_dob_changed_from_ppp(self):
+        changed = self.INFO | {"Requested DOB": "01-01-2001", "DOB In PPP": "01-01-2000"}
         ev = rd.Evidence(doc_class=rd.BIRTH, issuer="haryana", dob_found="exact")
-        d = run(ev, self.INFO | {"Requested DOB": "01-01-2001", "DOB In PPP": "01-01-2000"})
+        self.assertEqual(run(ev, changed).recommendation, "REJECT")   # Haryana certificate: QR readability is needed
+        other = rd.Evidence(doc_class=rd.BIRTH, issuer="uttar pradesh", dob_found="exact")
+        d = run(other, changed)
         self.assertEqual(d.recommendation, "HOLD")
         self.assertIn("PPP DOB changed", d.flags[0])
         self.assertEqual(run(ev, self.INFO | {"Requested DOB": "01-01-2001", "DOB In PPP": "01-01-2001"}).recommendation, "APPROVE")
@@ -365,3 +391,11 @@ class Classify(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class FindEpic(unittest.TestCase):
+    def test_reads_both_styles(self):
+        from analyser import electors
+        self.assertEqual(electors.find_epic("EPIC No : ABC 1234567 Name"), "ABC1234567")
+        self.assertEqual(electors.find_epic("no HR/12/123/456789 here"), "HR/12/123/456789")
+        self.assertEqual(electors.find_epic("nothing"), "")
